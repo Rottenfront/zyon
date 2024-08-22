@@ -1,5 +1,7 @@
 const std = @import("std");
-const Point = @import("point.zig").Point;
+const math = std.math;
+const mod = @import("module.zig");
+const Point = mod.Point;
 
 pub const QuadSpline = struct {
     data: std.ArrayList(Point),

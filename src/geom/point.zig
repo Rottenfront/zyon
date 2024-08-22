@@ -1,7 +1,10 @@
-const math = @import("std").math;
-const Affine = @import("affine.zig").Affine;
-const Size = @import("size.zig").Size;
-const Vec2 = @import("vec2.zig").Vec2;
+const std = @import("std");
+const math = std.math;
+const mod = @import("module.zig");
+const Affine = mod.Affine;
+const Size = mod.Size;
+const TranslateScale = mod.TranslateScale;
+const Vec2 = mod.Vec2;
 
 /// A 2D point.
 ///
@@ -27,7 +30,7 @@ pub const Point = struct {
 
     /// Create a new `Point` with the provided `x` and `y` coordinates.
     pub fn new(x: f64, y: f64) Point {
-        return Point{ x, y };
+        return Point{ .x = x, .y = y };
     }
 
     /// Convert this point into a `Vec2`.
@@ -136,6 +139,11 @@ pub const Point = struct {
         return math.isNan(self.x) or math.isNan(self.y);
     }
 
+    pub fn sum(self: Point, other: Point) Point {
+        return Point{ .x = self.x + other.x, .y = self.y + other.y };
+    }
+
+
     /// Apply an affine to a point
     pub fn applyAffine(self: Point, transform: Affine) Point {
         return Point{
@@ -144,7 +152,11 @@ pub const Point = struct {
         };
     }
 
-    pub fn sum(self: Point, other: Point) Point {
-        return Point{ .x = self.x + other.x, .y = self.y + other.y };
+    /// Apply an affine to a point
+    pub fn applyTranslateScale(self: Point, transform: TranslateScale) Point {
+        return Point{
+            .x = self.x * transform.scale + transform.translation.x,
+            .y = self.y * transform.scale + transform.translation.y,
+        };
     }
 };

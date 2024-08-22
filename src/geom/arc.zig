@@ -61,6 +61,25 @@ pub const Arc = struct {
             .angle0 = angle0,
         };
     }
+
+    /// Converts an Arc into a list of cubic bezier segments.
+    pub fn to_cubic_beziers(self: Arc, tolerance: f64, allocator: ?std.mem.Allocator) !std.ArrayList(PathEl) {
+        var path = self.appendIter(tolerance);
+        var result = std.ArrayList(PathEl).init(alloc: {
+            if (allocator != null) {
+                break :alloc allocator;
+            }
+            break :alloc std.heap.page_allocator;
+        });
+
+        var current_elem = path.next();
+        while (current_elem != null) {
+            result.append(current_elem);
+            current_elem = path.next();
+        }
+
+        return result;
+    }
 };
 
 pub const ArcAppendIter = struct {
@@ -83,15 +102,27 @@ pub const ArcAppendIter = struct {
 
         const angle1 = self.angle0 + self.angle_step;
         const p0 = self.p0;
-        const p1 = p0 + sample_ellipse(self.radii, self.x_rotation, self.angle0 + math.pi / 2.0).mul(self.arm_len);
+        const p1 = p0 + sample_ellipse(
+            self.radii,
+            self.x_rotation,
+            self.angle0 + math.pi / 2.0,
+        ).mul(self.arm_len);
         const p3 = sample_ellipse(self.radii, self.x_rotation, angle1);
-        const p2 = p3 - sample_ellipse(self.radii, self.x_rotation, self.angle1 + math.pi / 2.0).mul(self.arm_len);
+        const p2 = p3 - sample_ellipse(
+            self.radii,
+            self.x_rotation,
+            self.angle1 + math.pi / 2.0,
+        ).mul(self.arm_len);
 
         self.angle0 = angle1;
         self.p0 = p3;
         self.idx += 1;
 
-        return PathEl{ .curve_to = struct { .p0 = self.center.sum(p1), .p1 = self.center.sum(p2), .end = self.center.sum(p3) } };
+        return PathEl{ .curve_to = struct {
+            .p0 = self.center.sum(p1),
+            .p1 = self.center.sum(p2),
+            .end = self.center.sum(p3),
+        } };
     }
 };
 

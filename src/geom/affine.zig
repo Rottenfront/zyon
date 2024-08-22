@@ -1,8 +1,9 @@
 const std = @import("std");
 const math = std.math;
-const Point = @import("point.zig").Point;
-const Rect = @import("rect.zig").Rect;
-const Vec2 = @import("vec2.zig").Vec2;
+const mod = @import("module.zig");
+const Point = mod.Point;
+const Rect = mod.Rect;
+const Vec2 = mod.Vec2;
 
 /// A 2D affine transform.
 pub const Affine = struct {
@@ -330,13 +331,13 @@ fn affine_assert_near(a0: Affine, a1: Affine) !void {
 test "affine basic" {
     const p = Point.new(3.0, 4.0);
 
-    assert_near(Affine.IDENTITY * p, p);
-    assert_near(Affine.scale(2.0) * p, Point.new(6.0, 8.0));
-    assert_near(Affine.rotate(0.0) * p, p);
-    assert_near(Affine.rotate(math.pi / 2.0) * p, Point.new(-4.0, 3.0));
-    assert_near(Affine.translate(Vec2.new(5.0, 6.0)) * p, Point.new(8.0, 10.0));
-    assert_near(Affine.skew(0.0, 0.0) * p, p);
-    assert_near(Affine.skew(2.0, 4.0) * p, Point.new(11.0, 16.0));
+    try assert_near(p.applyAffine(Affine.IDENTITY), p);
+    try assert_near(p.applyAffine(Affine.scale(2.0)), Point.new(6.0, 8.0));
+    try assert_near(p.applyAffine(Affine.rotate(0.0)), p);
+    try assert_near(p.applyAffine(Affine.rotate(math.pi / 2.0)), Point.new(-4.0, 3.0));
+    try assert_near(p.applyAffine(Affine.translate(Vec2.new(5.0, 6.0))), Point.new(8.0, 10.0));
+    try assert_near(p.applyAffine(Affine.skew(0.0, 0.0)), p);
+    try assert_near(p.applyAffine(Affine.skew(2.0, 4.0)), Point.new(11.0, 16.0));
 }
 
 test "affine apply" {
@@ -347,9 +348,9 @@ test "affine apply" {
     const py = Point.new(0.0, 1.0);
     const pxy = Point.new(1.0, 1.0);
 
-    assert_near(px.applyAffine(a2).applyAffine(a1), px.applyAffine(a1).applyAffine(a2));
-    assert_near(py.applyAffine(a2).applyAffine(a1), py.applyAffine(a1).applyAffine(a2));
-    assert_near(pxy.applyAffine(a2).applyAffine(a1), pxy.applyAffine(a1).applyAffine(a2));
+    try assert_near(px.applyAffine(a2).applyAffine(a1), px.applyAffine(a1.apply(a2)));
+    try assert_near(py.applyAffine(a2).applyAffine(a1), py.applyAffine(a1.apply(a2)));
+    try assert_near(pxy.applyAffine(a2).applyAffine(a1), pxy.applyAffine(a1.apply(a2)));
 }
 
 test "affine invariant" {
@@ -359,25 +360,25 @@ test "affine invariant" {
     const px = Point.new(1.0, 0.0);
     const py = Point.new(0.0, 1.0);
     const pxy = Point.new(1.0, 1.0);
-    assert_near(px.applyAffine(a_inv).applyAffine(a), px);
-    assert_near(py.applyAffine(a_inv).applyAffine(a), py);
-    assert_near(pxy.applyAffine(a_inv).applyAffine(a), pxy);
-    assert_near(px.applyAffine(a).applyAffine(a_inv), px);
-    assert_near(py.applyAffine(a).applyAffine(a_inv), py);
-    assert_near(pxy.applyAffine(a).applyAffine(a_inv), pxy);
+    try assert_near(px.applyAffine(a_inv).applyAffine(a), px);
+    try assert_near(py.applyAffine(a_inv).applyAffine(a), py);
+    try assert_near(pxy.applyAffine(a_inv).applyAffine(a), pxy);
+    try assert_near(px.applyAffine(a).applyAffine(a_inv), px);
+    try assert_near(py.applyAffine(a).applyAffine(a_inv), py);
+    try assert_near(pxy.applyAffine(a).applyAffine(a_inv), pxy);
 }
 
 test "reflection" {
-    affine_assert_near(
+    try affine_assert_near(
         Affine.reflect(Point.ZERO, Vec2.new(1.0, 0.0)),
         Affine.new([_]f64{ 1.0, 0.0, 0.0, -1.0, 0.0, 0.0 }),
     );
-    affine_assert_near(
+    try affine_assert_near(
         Affine.reflect(Point.ZERO, Vec2.new(0.0, 1.0)),
         Affine.new([_]f64{ -1.0, 0.0, 0.0, 1.0, 0.0, 0.0 }),
     );
     // y = x
-    affine_assert_near(
+    try affine_assert_near(
         Affine.reflect(Point.ZERO, Vec2.new(1.0, 1.0)),
         Affine.new([_]f64{ 0.0, 1.0, 1.0, 0.0, 0.0, 0.0 }),
     );
@@ -386,15 +387,15 @@ test "reflection" {
     const point = Point.new(0.0, 0.0);
     const vec = Vec2.new(1.0, 1.0);
     const map = Affine.reflect(point, vec);
-    assert_near(Point.new(0.0, 0.0).applyAffine(map), Point.new(0.0, 0.0));
-    assert_near(Point.new(1.0, 1.0).applyAffine(map), Point.new(1.0, 1.0));
-    assert_near(Point.new(1.0, 2.0).applyAffine(map), Point.new(2.0, 1.0));
+    try assert_near(Point.new(0.0, 0.0).applyAffine(map), Point.new(0.0, 0.0));
+    try assert_near(Point.new(1.0, 1.0).applyAffine(map), Point.new(1.0, 1.0));
+    try assert_near(Point.new(1.0, 2.0).applyAffine(map), Point.new(2.0, 1.0));
 
     // with translate
     const point1 = Point.new(1.0, 0.0);
     const vec1 = Vec2.new(1.0, 1.0);
     const map1 = Affine.reflect(point1, vec1);
-    assert_near(Point.new(1.0, 0.0).applyAffine(map1), Point.new(1.0, 0.0));
-    assert_near(Point.new(2.0, 1.0).applyAffine(map1), Point.new(2.0, 1.0));
-    assert_near(Point.new(2.0, 2.0).applyAffine(map1), Point.new(3.0, 1.0));
+    try assert_near(Point.new(1.0, 0.0).applyAffine(map1), Point.new(1.0, 0.0));
+    try assert_near(Point.new(2.0, 1.0).applyAffine(map1), Point.new(2.0, 1.0));
+    try assert_near(Point.new(2.0, 2.0).applyAffine(map1), Point.new(3.0, 1.0));
 }

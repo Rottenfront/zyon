@@ -1,7 +1,10 @@
 const std = @import("std");
-const Affine = @import("affine.zig").Affine;
-const Point = @import("point.zig").Point;
-const Size = @import("size.zig").Size;
+const math = std.math;
+const mod = @import("module.zig");
+const Affine = mod.Affine;
+const Point = mod.Point;
+const Size = mod.Size;
+const TranslateScale = mod.TranslateScale;
 
 /// A 2D vector.
 ///
@@ -226,6 +229,7 @@ pub const Vec2 = struct {
         return std.math.isNan(self.x) || std.math.isNan(self.y);
     }
 
+    /// Negative (opposite) vector
     pub fn neg(self: Vec2) Vec2 {
         return Vec2{
             .x = -self.x,
@@ -233,7 +237,7 @@ pub const Vec2 = struct {
         };
     }
 
-    /// Returns sum of vectors
+    /// Sum of vectors
     pub fn sum(self: Vec2, other: Vec2) Vec2 {
         return Vec2{
             .x = self.x + other.x,
@@ -241,7 +245,7 @@ pub const Vec2 = struct {
         };
     }
 
-    /// Returns difference of vectors
+    /// Difference of vectors
     pub fn sub(self: Vec2, other: Vec2) Vec2 {
         return Vec2{
             .x = self.x - other.x,
@@ -249,6 +253,7 @@ pub const Vec2 = struct {
         };
     }
 
+    /// Multiplied by `t` value vector
     pub fn mul(self: Vec2, t: f64) Vec2 {
         return Vec2{
             .x = self.x * t,
@@ -256,6 +261,7 @@ pub const Vec2 = struct {
         };
     }
 
+    /// Divided by `t` value vector
     pub fn div(self: Vec2, t: f64) Vec2 {
         return Vec2{
             .x = self.x / t,
@@ -268,6 +274,14 @@ pub const Vec2 = struct {
         return Point{
             .x = self.x * transform.a[0] + self.y * transform.a[2] + transform.a[4],
             .y = self.x * transform.a[1] + self.y * transform.a[3] + transform.a[5],
+        };
+    }
+
+    /// Apply an affine to a point
+    pub fn applyTranslateScale(self: Vec2, transform: TranslateScale) Vec2 {
+        return Vec2{
+            .x = self.x * transform.scale + transform.translation.x,
+            .y = self.y * transform.scale + transform.translation.y,
         };
     }
 };

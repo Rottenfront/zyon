@@ -1,5 +1,8 @@
-const CubicBez = @import("cubicbez.zig").CubicBez;
-const QuadBez = @import("quadbez.zig").QuadBez;
+const std = @import("std");
+const math = std.math;
+const mod = @import("module.zig");
+const CubicBez = mod.CubicBez;
+const QuadBez = mod.QuadBez;
 
 /// The offset curve of a cubic Bézier.
 ///
