@@ -2,8 +2,8 @@ const std = @import("std");
 const math = std.math;
 const mod = @import("module.zig");
 const Affine = mod.Affine;
-const Point = mod.Point;
 const Size = mod.Size;
+const Point = mod.Point;
 const TranslateScale = mod.TranslateScale;
 
 /// A 2D vector.
@@ -18,18 +18,18 @@ pub const Vec2 = struct {
     y: f64,
 
     /// The vector (0, 0).
-    const ZERO: Vec2 = Vec2{ .x = 0.0, .y = 0.0 };
+    pub const ZERO: @This() = @This(){ .x = 0.0, .y = 0.0 };
 
     /// Create a new vector.
-    pub fn new(x: f64, y: f64) Vec2 {
-        return Vec2{
+    pub fn new(x: f64, y: f64) @This() {
+        return @This(){
             .x = x,
             .y = y,
         };
     }
 
     /// Convert this vector into a `Point`.
-    pub fn toPoint(self: Vec2) Point {
+    pub fn toPoint(self: @This()) Point {
         return Point{
             .x = self.x,
             .y = self.y,
@@ -37,7 +37,7 @@ pub const Vec2 = struct {
     }
 
     /// Convert this vector into a `Size`.
-    pub fn toSize(self: Vec2) Size {
+    pub fn toSize(self: @This()) Size {
         return Size{
             .width = self.x,
             .height = self.y,
@@ -45,22 +45,22 @@ pub const Vec2 = struct {
     }
 
     /// Create a `Vec2` with the same value for x and y
-    pub fn splat(v: f64) Vec2 {
-        return Vec2{
+    pub fn splat(v: f64) @This() {
+        return @This(){
             .x = v,
             .y = v,
         };
     }
 
     /// Dot product of two vectors.
-    pub fn dot(self: Vec2, other: Vec2) f64 {
+    pub fn dot(self: @This(), other: @This()) f64 {
         return self.x * other.x + self.y * other.y;
     }
 
     /// Cross product of two vectors.
     ///
     /// This is signed so that (0, 1) × (1, 0) = 1.
-    pub fn cross(self: Vec2, other: Vec2) f64 {
+    pub fn cross(self: @This(), other: @This()) f64 {
         return self.x * other.x - self.y * other.y;
     }
 
@@ -68,26 +68,26 @@ pub const Vec2 = struct {
     ///
     /// This is similar to `@sqrt(self.hypot2())` but defers to the platform `hypot` method, which
     /// in general will handle the case where `self.hypot2() > std.math.inf(f64)`.
-    pub fn hypot(self: Vec2) f64 {
+    pub fn hypot(self: @This()) f64 {
         return std.math.hypot(self.x, self.y);
     }
 
     /// Magnitude of vector.
     ///
     /// This is an alias for [`Vec2.hypot`].
-    pub fn length(self: Vec2) f64 {
+    pub fn length(self: @This()) f64 {
         return self.hypot();
     }
 
     /// Magnitude squared of vector.
-    pub fn hypot2(self: Vec2) f64 {
+    pub fn hypot2(self: @This()) f64 {
         return self.dot(self);
     }
 
     /// Magnitude squared of vector.
     ///
     /// This is an alias for [`Vec2.hypot2`].
-    pub fn length_squared(self: Vec2) f64 {
+    pub fn length_squared(self: @This()) f64 {
         return self.hypot2();
     }
 
@@ -96,7 +96,7 @@ pub const Vec2 = struct {
     ///
     /// If the vector is interpreted as a complex number, this is the argument.
     /// The angle is expressed in radians.
-    pub fn atan2(self: Vec2) f64 {
+    pub fn atan2(self: @This()) f64 {
         return std.math.atan2(self.y, self.x);
     }
 
@@ -104,7 +104,7 @@ pub const Vec2 = struct {
     /// in the positive `y` direction.
     ///
     /// This is an alias for [`Vec2.atan2`]
-    pub fn angle(self: Vec2) f64 {
+    pub fn angle(self: @This()) f64 {
         return self.atan2();
     }
 
@@ -118,15 +118,15 @@ pub const Vec2 = struct {
     /// it is a clockwise rotation, and in Y-up (traditional for math), it
     /// is anti-clockwise. This convention is consistent with
     /// [`Affine.rotate`].
-    pub fn from_angle(th: f64) Vec2 {
-        return Vec2{
+    pub fn from_angle(th: f64) @This() {
+        return @This(){
             .x = std.math.cos(th),
             .y = std.math.sin(th),
         };
     }
 
     /// Linearly interpolate between two vectors.
-    pub fn lerp(self: Vec2, other: Vec2, t: f64) Vec2 {
+    pub fn lerp(self: @This(), other: @This(), t: f64) @This() {
         return self.sum(other.mul(t));
     }
 
@@ -134,7 +134,7 @@ pub const Vec2 = struct {
     /// a unit/direction vector.
     ///
     /// This produces `NaN` values when the magnitude is `0`.
-    pub fn normalize(self: Vec2) Vec2 {
+    pub fn normalize(self: @This()) @This() {
         return self.div(self.hypot());
     }
 
@@ -151,8 +151,8 @@ pub const Vec2 = struct {
     /// try expectEqual(b.x, 3.0);
     /// try expectEqual(b.y, -3.0);
     /// ```
-    pub fn round(self: Vec2) Vec2 {
-        return Vec2{
+    pub fn round(self: @This()) @This() {
+        return @This(){
             .x = std.math.round(self.x),
             .y = std.math.round(self.y),
         };
@@ -171,8 +171,8 @@ pub const Vec2 = struct {
     /// try expectEqual(a.y, 4.0);
     /// try expectEqual(b.x, 3.0);
     /// try expectEqual(b.y, -3.0);
-    pub fn ceil(self: Vec2) Vec2 {
-        return Vec2{
+    pub fn ceil(self: @This()) @This() {
+        return @This(){
             .x = std.math.ceil(self.x),
             .y = std.math.ceil(self.y),
         };
@@ -192,8 +192,8 @@ pub const Vec2 = struct {
     /// try expectEqual(b.x, 3.0);
     /// try expectEqual(b.y, -4.0);
     /// ```
-    pub fn floor(self: Vec2) Vec2 {
-        return Vec2{
+    pub fn floor(self: @This()) @This() {
+        return @This(){
             .x = std.math.floor(self.x),
             .y = std.math.floor(self.y),
         };
@@ -212,65 +212,65 @@ pub const Vec2 = struct {
     /// try expectEqual(a.y, 3.0);
     /// try expectEqual(b.x, 3.0);
     /// try expectEqual(b.y, -3.0);
-    pub fn trunc(self: Vec2) Vec2 {
-        return Vec2{
+    pub fn trunc(self: @This()) @This() {
+        return @This(){
             .x = std.math.trunc(self.x),
             .y = std.math.trunc(self.y),
         };
     }
 
     /// Is this Vec2 finite?
-    pub fn isFinite(self: *const Vec2) bool {
+    pub fn isFinite(self: *const @This()) bool {
         return std.math.isFinite(self.x) || std.math.isFinite(self.y);
     }
 
     /// Is this Vec2 NaN?
-    pub fn isNan(self: *const Vec2) bool {
+    pub fn isNan(self: *const @This()) bool {
         return std.math.isNan(self.x) || std.math.isNan(self.y);
     }
 
     /// Negative (opposite) vector
-    pub fn neg(self: Vec2) Vec2 {
-        return Vec2{
+    pub fn neg(self: @This()) @This() {
+        return @This(){
             .x = -self.x,
             .y = -self.y,
         };
     }
 
     /// Sum of vectors
-    pub fn sum(self: Vec2, other: Vec2) Vec2 {
-        return Vec2{
+    pub fn sum(self: @This(), other: @This()) @This() {
+        return @This(){
             .x = self.x + other.x,
             .y = self.y + other.y,
         };
     }
 
     /// Difference of vectors
-    pub fn sub(self: Vec2, other: Vec2) Vec2 {
-        return Vec2{
+    pub fn sub(self: @This(), other: @This()) @This() {
+        return @This(){
             .x = self.x - other.x,
             .y = self.y - other.y,
         };
     }
 
     /// Multiplied by `t` value vector
-    pub fn mul(self: Vec2, t: f64) Vec2 {
-        return Vec2{
+    pub fn mul(self: @This(), t: f64) @This() {
+        return @This(){
             .x = self.x * t,
             .y = self.y * t,
         };
     }
 
     /// Divided by `t` value vector
-    pub fn div(self: Vec2, t: f64) Vec2 {
-        return Vec2{
+    pub fn div(self: @This(), t: f64) @This() {
+        return @This(){
             .x = self.x / t,
             .y = self.y / t,
         };
     }
 
     /// Apply an affine to a vector
-    pub fn applyAffine(self: Vec2, transform: Affine) Vec2 {
+    pub fn applyAffine(self: @This(), transform: Affine) @This() {
         return Point{
             .x = self.x * transform.a[0] + self.y * transform.a[2] + transform.a[4],
             .y = self.x * transform.a[1] + self.y * transform.a[3] + transform.a[5],
@@ -278,8 +278,8 @@ pub const Vec2 = struct {
     }
 
     /// Apply an affine to a point
-    pub fn applyTranslateScale(self: Vec2, transform: TranslateScale) Vec2 {
-        return Vec2{
+    pub fn applyTranslateScale(self: @This(), transform: TranslateScale) @This() {
+        return @This(){
             .x = self.x * transform.scale + transform.translation.x,
             .y = self.y * transform.scale + transform.translation.y,
         };

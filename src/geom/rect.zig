@@ -1,10 +1,8 @@
 const std = @import("std");
 const math = std.math;
 const mod = @import("module.zig");
-const Affine = mod.Affine;
 const Point = mod.Point;
 const RoundRect = mod.RoundRect;
-const RoundRectRadii = mod.RoundRectRadii;
 
 pub const Rect = struct {
     x0: f64,
@@ -47,7 +45,7 @@ pub const Rect = struct {
         );
     }
 
-    pub fn toRoundRect(self: Rect, radii: RoundRectRadii) RoundRect {
+    pub fn toRoundRect(self: Rect, radii: RoundRect.Radii) RoundRect {
         return RoundRect.new(self, radii);
     }
 };

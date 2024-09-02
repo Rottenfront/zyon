@@ -5,7 +5,6 @@ const mod = @import("module.zig");
 const Point = mod.Point;
 
 pub const CubicBez = @import("bezpath/cubic.zig").CubicBez;
-pub const CuspType = @import("bezpath/cubic.zig").CuspType;
 pub const Line = @import("bezpath/line.zig").Line;
 pub const QuadBez = @import("bezpath/quad.zig").QuadBez;
 
@@ -47,22 +46,25 @@ pub const QuadBez = @import("bezpath/quad.zig").QuadBez;
 ///
 /// [A Primer on Bézier Curves]: https://pomax.github.io/bezierinfo/
 pub const BezPath = struct {
-    pub const PathList: type = std.ArrayList(PathEl);
+    pub const PathList: type = std.ArrayList(Element);
     pub const allocator = std.heap.page_allocator;
 
     data: PathList,
 
+    /// Create a new path.
     pub fn new() @This() {
         return @This(){
             .data = PathList.init(@This().allocator),
         };
     }
 
-    pub fn pop(self: *@This()) ?PathEl {
+    /// Removes the last [`PathEl`] from the path and returns it, or `None` if the path is empty.
+    pub fn pop(self: *@This()) ?Element {
         return self.data.popOrNull();
     }
 
-    pub fn push(self: *@This(), el: PathEl) @This().allocator.Error!void {
+    /// Push a generic path element onto the path.
+    pub fn push(self: *@This(), el: Element) @This().allocator.Error!void {
         try self.data.append(el);
         std.debug.assert(match: {
             switch (self.data.items[0]) {
@@ -72,93 +74,172 @@ pub const BezPath = struct {
         });
     }
 
+    /// Push a "move to" element onto the path.
     pub fn move_to(self: *@This(), p: Point) @This().allocator.Error!void {
-        return self.push(PathEl{ .move_to = .{ .p = p } });
+        return self.push(Element{ .move_to = .{ .p = p } });
     }
 
+    /// Push a "line to" element onto the path.
+    ///
+    /// Will panic with a debug assert when the path is empty and there is no
+    /// "move to" element on the path.
+    ///
+    /// If `line_to` is called immediately after `close_path` then the current
+    /// subpath starts at the initial point of the previous subpath.
     pub fn line_to(self: *@This(), end: Point) @This().allocator.Error!void {
-        return self.push(PathEl{ .line_to = .{ .end = end } });
+        return self.push(Element{ .line_to = .{ .end = end } });
     }
 
+    /// Push a "quad to" element onto the path.
+    ///
+    /// Will panic with a debug assert when the path is empty and there is no
+    /// "move to" element on the path.
+    ///
+    /// If `quad_to` is called immediately after `close_path` then the current
+    /// subpath starts at the initial point of the previous subpath.
     pub fn quad_to(
         self: *@This(),
         p0: Point,
         end: Point,
     ) @This().allocator.Error!void {
-        return self.push(PathEl{ .quad_to = .{ .p0 = p0, .end = end } });
+        return self.push(Element{ .quad_to = .{ .p0 = p0, .end = end } });
     }
 
+    /// Push a "curve to" element onto the path.
+    ///
+    /// Will panic with a debug assert when the path is empty and there is no
+    /// "move to" element on the path.
+    ///
+    /// If `curve_to` is called immediately after `close_path` then the current
+    /// subpath starts at the initial point of the previous subpath.
     pub fn curve_to(
         self: *@This(),
         p0: Point,
         p1: Point,
         end: Point,
     ) @This().allocator.Error!void {
-        return self.push(PathEl{ .curve_to = .{
+        return self.push(Element{ .curve_to = .{
             .p0 = p0,
             .p1 = p1,
             .end = end,
         } });
     }
 
+    /// Push a "close path" element onto the path.
+    ///
+    /// Will panic with a debug assert when the path is empty and there is no
+    /// "move to" element on the path.
     pub fn close_path(self: *@This()) @This().allocator.Error!void {
-        return self.push(PathEl{.close_path});
+        return self.push(Element{.close_path});
     }
-};
 
-/// The element of a Bézier path.
-///
-/// A valid path has `MoveTo` at the beginning of each subpath.
-pub const PathEl = union(enum) {
-    /// Move directly to the point without drawing anything, starting a new
-    /// subpath.
-    move_to: struct { p: Point },
-    /// Draw a line from the current location to the point.
-    line_to: struct { end: Point },
-    /// Draw a quadratic bezier using the current location and the two points.
-    quad_to: struct { p0: Point, end: Point },
-    /// Draw a cubic bezier using the current location and the three points.
-    curve_to: struct { p0: Point, p1: Point, end: Point },
-    /// Close off the path.
-    close_path,
-};
+    /// Shorten the path, keeping the first `len` elements.
+    pub fn truncate(self: *@This(), len: usize) @This().allocator.Error!void {
+        if (self.data.items.len > len) {
+            return self.data.resize(len);
+        }
+    }
 
-/// A segment of a Bézier path.
-pub const PathSeg = union(enum) {
-    /// A line segment.
-    line: Line,
-    /// A quadratic bezier segment.
-    quad: QuadBez,
-    /// A cubic bezier segment.
-    curve: CubicBez,
-};
+    pub fn flatten(self: *@This(), tolerance: f64, ST: type, start_context: *ST, callback: fn (*ST, Element) void) void {
+        const sqrt_tol = @sqrt(tolerance);
+        var last_pt: ?Point = null;
+        // var quad_buf = std.ArrayList(struct {
+        //     quad: QuadBez,
+        //     params: QuadBez.FlattenParams,
+        // }).init(allocator);
 
-/// An intersection of a [`Line`] and a [`PathSeg`].
-///
-/// This can be generated with the [`PathSeg::intersect_line`] method.
-pub const LineIntersection = struct {
-    /// The 'time' that the intersection occurs, on the line.
+        for (self.data.items) |el| {
+            switch (el) {
+                .move_to => |data| {
+                    last_pt = data.p;
+                    callback(start_context, Element{
+                        .move_to = struct { .p = data.p },
+                    });
+                },
+                .line_to => |data| {
+                    last_pt = data.p;
+                    callback(start_context, Element{
+                        .line_to = struct { .p = data.p },
+                    });
+                },
+                .quad_to => |data| {
+                    if (last_pt != null) {
+                        const q = QuadBez.new(last_pt.?, data.p0, data.end);
+                        const params = q.estimateSubdiv(sqrt_tol);
+                        const n = @max(@as(usize, math.ceil(0.5 * params.val / sqrt_tol)), 1);
+                        const step = 1.0 / @as(f64, n);
+                        for (1..n) |i| {
+                            const u = @as(f64, i) * step;
+                            const t = q.determineSubdivT(&params, u);
+                            const p = q.eval(t);
+                            callback(start_context, Element{
+                                .line_to = struct { .p = p },
+                            });
+                        }
+                        callback(start_context, Element{
+                            .line_to = struct { .p = data.end },
+                        });
+                    }
+                    last_pt = data.end;
+                },
+            }
+        }
+    }
+
+    /// The element of a Bézier path.
     ///
-    /// This value is in the range 0..1.
-    line_t: f64,
+    /// A valid path has `MoveTo` at the beginning of each subpath.
+    pub const Element = union(enum) {
+        /// Move directly to the point without drawing anything, starting a new
+        /// subpath.
+        move_to: struct { p: Point },
+        /// Draw a line from the current location to the point.
+        line_to: struct { end: Point },
+        /// Draw a quadratic bezier using the current location and the two points.
+        quad_to: struct { p0: Point, end: Point },
+        /// Draw a cubic bezier using the current location and the three points.
+        curve_to: struct { p0: Point, p1: Point, end: Point },
+        /// Close off the path.
+        close_path,
+    };
 
-    /// The 'time' that the intersection occurs, on the path segment.
-    ///
-    /// This value is nominally in the range 0..1, although it may slightly exceed
-    /// that range at the boundaries of segments.
-    segment_t: f64,
-};
+    /// A segment of a Bézier path.
+    pub const Segment = union(enum) {
+        /// A line segment.
+        line: Line,
+        /// A quadratic bezier segment.
+        quad: QuadBez,
+        /// A cubic bezier segment.
+        curve: CubicBez,
+    };
 
-/// The minimum distance between two Bézier curves.
-pub const MinDistance = struct {
-    /// The shortest distance between any two points on the two curves.
-    distance: f64,
-    /// The position of the nearest point on the first curve, as a parameter.
+    /// An intersection of a [`Line`] and a [`PathSeg`].
     ///
-    /// To resolve this to a [`Point`], use [`ParamCurve.eval`].
-    t1: f64,
-    /// The position of the nearest point on the second curve, as a parameter.
-    ///
-    /// To resolve this to a [`Point`], use [`ParamCurve.eval`].
-    t2: f64,
+    /// This can be generated with the [`PathSeg::intersect_line`] method.
+    pub const LineIntersection = struct {
+        /// The 'time' that the intersection occurs, on the line.
+        ///
+        /// This value is in the range 0..1.
+        line_t: f64,
+
+        /// The 'time' that the intersection occurs, on the path segment.
+        ///
+        /// This value is nominally in the range 0..1, although it may slightly exceed
+        /// that range at the boundaries of segments.
+        segment_t: f64,
+    };
+
+    /// The minimum distance between two Bézier curves.
+    pub const MinDistance = struct {
+        /// The shortest distance between any two points on the two curves.
+        distance: f64,
+        /// The position of the nearest point on the first curve, as a parameter.
+        ///
+        /// To resolve this to a [`Point`], use [`ParamCurve.eval`].
+        t1: f64,
+        /// The position of the nearest point on the second curve, as a parameter.
+        ///
+        /// To resolve this to a [`Point`], use [`ParamCurve.eval`].
+        t2: f64,
+    };
 };

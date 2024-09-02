@@ -4,6 +4,7 @@ const mod = @import("module.zig");
 const Affine = mod.Affine;
 const Point = mod.Point;
 const Vec2 = mod.Vec2;
+const util = mod.util;
 
 /// A transformation consisting of a uniform scaling followed by a translation.
 ///
@@ -33,16 +34,16 @@ pub const TranslateScale = struct {
     /// The scale component of this transformation
     scale: f64,
 
-    pub fn new(translation: Vec2, s: f64) TranslateScale {
-        return TranslateScale{ .translation = translation, .scale = s };
+    pub fn new(translation: Vec2, s: f64) @This() {
+        return @This(){ .translation = translation, .scale = s };
     }
 
-    pub fn scale(s: f64) TranslateScale {
-        return TranslateScale{ .translation = Vec2.ZERO, .scale = s };
+    pub fn scale(s: f64) @This() {
+        return @This(){ .translation = Vec2.ZERO, .scale = s };
     }
 
-    pub fn translate(translation: Vec2) TranslateScale {
-        return TranslateScale{ .translation = translation, .scale = 1.0 };
+    pub fn translate(translation: Vec2) @This() {
+        return @This(){ .translation = translation, .scale = 1.0 };
     }
 
     /// Create a transform that scales about a point other than the origin.
@@ -57,13 +58,13 @@ pub const TranslateScale = struct {
     /// // (2.0, 2.0) -> (3.0, 3.0)
     /// assert_near(Point.new(2.0, 2.0).applyTranslateScale(ts), Point.new(3.0, 3.0));
     /// ```
-    pub fn fromScaleSbout(s: f64, focus: Point) TranslateScale {
+    pub fn fromScaleSbout(s: f64, focus: Point) @This() {
         // We need to create a transform that is equivalent to translating `focus`
         // to the origin, followed by a normal scale, followed by reversing the translation.
         // We need to find the (translation ∘ scale) that matches this.
         const focus_vector = focus.toVec2();
         const translation = focus_vector.sub(focus_vector.mul(s));
-        return TranslateScale{ .translation = translation, .scale = s };
+        return @This(){ .translation = translation, .scale = s };
     }
 
     /// Compute the inverse transform.
@@ -73,75 +74,72 @@ pub const TranslateScale = struct {
     /// (modulo floating point rounding errors).
     ///
     /// Produces NaN values when scale is zero.
-    pub fn inverse(self: TranslateScale) TranslateScale {
+    pub fn inverse(self: @This()) @This() {
         const scale_recip = 1.0 / self.scale;
-        return TranslateScale{
+        return @This(){
             .translation = self.translation.mul(-scale_recip),
             .scale = scale_recip,
         };
     }
 
     /// Is this translate/scale finite?
-    pub fn isFinite(self: *TranslateScale) bool {
+    pub fn isFinite(self: *@This()) bool {
         return self.translation.isFinite() and math.isFinite(self.scale);
     }
 
     /// Is this translate/scale NaN?
-    pub fn isNan(self: *TranslateScale) bool {
+    pub fn isNan(self: *@This()) bool {
         return self.translation.isNan() or math.isNan(self.scale);
     }
 
     /// Apply self on other `TranslateScale`
-    pub fn apply(self: TranslateScale, other: TranslateScale) TranslateScale {
-        return TranslateScale{ .translation = self.translation.sum(other.translation.mul(self.scale)), .scale = self.scale * other.scale };
+    pub fn apply(self: @This(), other: @This()) @This() {
+        return @This(){ .translation = self.translation.sum(other.translation.mul(self.scale)), .scale = self.scale * other.scale };
+    }
+
+    pub fn toAffine(self: @This()) Affine {
+        return Affine{ .a = [_]f64{
+            self.scale,
+            0.0,
+            0.0,
+            self.scale,
+            self.translation.x,
+            self.translation.y,
+        } };
     }
 };
-
-//    use crate::{Affine, Point, TranslateScale, Vec2};
-//
-//    fn assert_near(p0: Point, p1: Point) {
-//        assert!((p1 - p0).hypot() < 1e-9, "{p0:?} != {p1:?}");
-//    }
-//
-//    #[test]
-//    fn translate_scale() {
-//        let p = Point::new(3.0, 4.0);
-//        let ts = TranslateScale::new(Vec2::new(5.0, 6.0), 2.0);
-//
-//        assert_near(ts * p, Point::new(11.0, 14.0));
-//    }
-//
-//    #[test]
-//    fn conversions() {
-//        let p = Point::new(3.0, 4.0);
-//        let s = 2.0;
-//        let t = Vec2::new(5.0, 6.0);
-//        let ts = TranslateScale::new(t, s);
-//
-//        // Test that conversion to affine is consistent.
-//        let a: Affine = ts.into();
-//        assert_near(ts * p, a * p);
-//
-//        assert_near((s * p.to_vec2()).to_point(), TranslateScale::scale(s) * p);
-//        assert_near(p + t, TranslateScale::translate(t) * p);
-//    }
-//
-//    #[test]
-//    fn inverse() {
-//        let p = Point::new(3.0, 4.0);
-//        let ts = TranslateScale::new(Vec2::new(5.0, 6.0), 2.0);
-//
-//        assert_near(p, (ts * ts.inverse()) * p);
-//        assert_near(p, (ts.inverse() * ts) * p);
-//    }
-
-fn assert_near(p0: Point, p1: Point) !void {
-    try std.testing.expect(p1.distance(p0) < 1e-9);
-}
 
 test "translate/scale" {
     const p = Point.new(3.0, 4.0);
     const ts = TranslateScale.new(Vec2.new(5.0, 6.0), 2.0);
 
-    assert_near(p.applyTranslateScale(ts), Point.new(11.0, 14.0));
+    try util.expect_near(p.applyTranslateScale(ts), Point.new(11.0, 14.0));
+}
+
+test "conversions" {
+    const p = Point.new(3.0, 4.0);
+    const s = 2.0;
+    const t = Vec2.new(5.0, 6.0);
+    const ts = TranslateScale.new(t, s);
+
+    const a = ts.toAffine();
+
+    try util.expect_near(p.applyTranslateScale(ts), p.applyAffine(a));
+
+    try util.expect_near(
+        p.toVec2().mul(s).toPoint(),
+        p.applyTranslateScale(TranslateScale.scale(s)),
+    );
+    try util.expect_near(
+        p.toVec2().sum(t).toPoint(),
+        p.applyTranslateScale(TranslateScale.translate(t)),
+    );
+}
+
+test "inverse" {
+    const p = Point.new(3.0, 4.0);
+    const ts = TranslateScale.new(Vec2.new(5.0, 6.0), 2.0);
+
+    try util.expect_near(p, p.applyTranslateScale(ts.apply(ts.inverse())));
+    try util.expect_near(p, p.applyTranslateScale(ts.inverse().apply(ts)));
 }

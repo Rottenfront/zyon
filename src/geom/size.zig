@@ -167,7 +167,7 @@ pub const Size = struct {
 
     /// Convert this `Size` into a [`RoundedRect`] with origin `(0.0, 0.0)` and
     /// the provided corner radius.
-    pub fn toRoundRect(self: Size, radii: RoundRectRadii) RoundRect {
+    pub fn toRoundRect(self: Size, radii: RoundRect.Radii) RoundRect {
         return self.toRect().toRoundRect(radii);
     }
 

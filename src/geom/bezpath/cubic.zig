@@ -4,19 +4,20 @@ const mod = @import("../module.zig");
 const Point = mod.Point;
 
 pub const CubicBez = struct {
-    start: Point,
     p0: Point,
     p1: Point,
-    end: Point,
+    p2: Point,
+    p3: Point,
 
-    pub fn new(start: Point, p0: Point, p1: Point, end: Point) CubicBez {
-        return CubicBez{ .start = start, .p0 = p0, .p1 = p1, .end = end };
+    pub fn new(p0: Point, p1: Point, p2: Point, p3: Point) @This() {
+        return @This(){ .p0 = p0, .p1 = p1, .p2 = p2, .p3 = p3 };
     }
-};
 
-pub const CuspType = enum {
-    /// Cusp is a loop.
-    Loop,
-    /// Cusp has two closely spaced inflection points.
-    DoubleInflection,
+    /// Classification result for cusp detection.
+    pub const CuspType = enum {
+        /// Cusp is a loop.
+        Loop,
+        /// Cusp has two closely spaced inflection points.
+        DoubleInflection,
+    };
 };

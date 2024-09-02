@@ -4,10 +4,10 @@ const mod = @import("../module.zig");
 const Point = mod.Point;
 
 pub const Line = struct {
-    start: Point,
-    end: Point,
+    p0: Point,
+    p1: Point,
 
-    pub fn new(start: Point, end: Point) Line {
-        return Line{ .start = start, .end = end };
+    pub fn new(p0: Point, p1: Point) @This() {
+        return @This(){ .p0 = p0, .p1 = p1 };
     }
 };

@@ -2,7 +2,8 @@ const std = @import("std");
 const math = std.math;
 const mod = @import("module.zig");
 const Affine = mod.Affine;
-const PathEl = mod.PathEl;
+const BezPath = mod.BezPath;
+const util = mod.util;
 const Point = mod.Point;
 const Vec2 = mod.Vec2;
 
@@ -21,8 +22,8 @@ pub const Arc = struct {
     x_rotation: f64,
 
     /// Create a new `Arc`
-    pub fn new(center: Point, radii: Vec2, start_angle: f64, sweep_angle: f64, x_rotation: f64) Arc {
-        return Arc{
+    pub fn new(center: Point, radii: Vec2, start_angle: f64, sweep_angle: f64, x_rotation: f64) @This() {
+        return @This(){
             .center = center,
             .radii = radii,
             .start_angle = start_angle,
@@ -34,7 +35,7 @@ pub const Arc = struct {
     /// Create an iterator generating Bezier path elements.
     ///
     /// The generated elements can be appended to an existing bezier path.
-    pub fn appendIter(self: *const Arc, tolerance: f64) ArcAppendIter {
+    pub fn appendIter(self: *const @This(), tolerance: f64) AppendIter {
         const sign = math.sign(self.sweep_angle);
         const scaled_err = @max(self.radii.x, self.radii.y) / tolerance;
         // Number of subdivisions per ellipse based on error tolerance.
@@ -45,9 +46,9 @@ pub const Arc = struct {
         const n: usize = math.round(n_f64);
         const arm_len = (4.0 / 3.0) * math.tan(@abs(0.25 * angle_step)) * sign;
         const angle0 = self.start_angle;
-        const p0 = sample_ellipse(self.radii, self.x_rotation, angle0);
+        const p0 = util.sample_ellipse(self.radii, self.x_rotation, angle0);
 
-        return ArcAppendIter{
+        return AppendIter{
             .idx = 0,
 
             .center = self.center,
@@ -63,9 +64,13 @@ pub const Arc = struct {
     }
 
     /// Converts an Arc into a list of cubic bezier segments.
-    pub fn to_cubic_beziers(self: Arc, tolerance: f64, allocator: ?std.mem.Allocator) !std.ArrayList(PathEl) {
+    pub fn to_cubic_beziers(
+        self: @This(),
+        tolerance: f64,
+        allocator: ?std.mem.Allocator,
+    ) !std.ArrayList(BezPath.Element) {
         var path = self.appendIter(tolerance);
-        var result = std.ArrayList(PathEl).init(alloc: {
+        var result = std.ArrayList(BezPath.Element).init(alloc: {
             if (allocator != null) {
                 break :alloc allocator;
             }
@@ -80,68 +85,75 @@ pub const Arc = struct {
 
         return result;
     }
-};
 
-pub const ArcAppendIter = struct {
-    idx: usize,
+    pub const AppendIter = struct {
+        idx: isize,
 
-    center: Point,
-    radii: Vec2,
-    x_rotation: f64,
-    n: usize,
-    arm_len: f64,
-    angle_step: f64,
+        center: Point,
+        radii: Vec2,
+        x_rotation: f64,
+        n: usize,
+        arm_len: f64,
+        angle_step: f64,
 
-    p0: Vec2,
-    angle0: f64,
+        p0: Vec2,
+        angle0: f64,
 
-    pub fn next(self: *ArcAppendIter) ?PathEl {
-        if (self.idx >= self.n) {
-            return null;
+        pub fn next(self: *@This()) ?BezPath.Element {
+            if (self.idx == -1) {
+                self.idx += 1;
+                return BezPath.Element{
+                    .move_to = struct {
+                        .p = self.p0,
+                    },
+                };
+            }
+
+            if (self.idx >= self.n) {
+                return null;
+            }
+
+            const angle1 = self.angle0 + self.angle_step;
+            const p0 = self.p0;
+            const p1 = p0 + util.sample_ellipse(
+                self.radii,
+                self.x_rotation,
+                self.angle0 + math.pi / 2.0,
+            ).mul(self.arm_len);
+            const p3 = util.sample_ellipse(self.radii, self.x_rotation, angle1);
+            const p2 = p3 - util.sample_ellipse(
+                self.radii,
+                self.x_rotation,
+                self.angle1 + math.pi / 2.0,
+            ).mul(self.arm_len);
+
+            self.angle0 = angle1;
+            self.p0 = p3;
+            self.idx += 1;
+
+            return BezPath.Element{ .curve_to = struct {
+                .p0 = self.center.sum(p1),
+                .p1 = self.center.sum(p2),
+                .end = self.center.sum(p3),
+            } };
         }
+    };
 
-        const angle1 = self.angle0 + self.angle_step;
-        const p0 = self.p0;
-        const p1 = p0 + sample_ellipse(
-            self.radii,
-            self.x_rotation,
-            self.angle0 + math.pi / 2.0,
-        ).mul(self.arm_len);
-        const p3 = sample_ellipse(self.radii, self.x_rotation, angle1);
-        const p2 = p3 - sample_ellipse(
-            self.radii,
-            self.x_rotation,
-            self.angle1 + math.pi / 2.0,
-        ).mul(self.arm_len);
+    pub fn pathElements(self: *const @This(), tolerance: f64) AppendIter {
+        var iter = self.appendIter(tolerance);
+        iter.idx = -1;
+        return iter;
+    }
 
-        self.angle0 = angle1;
-        self.p0 = p3;
-        self.idx += 1;
+    /// Note: shape isn't closed so area is not well defined.
+    pub fn area(self: *const @This()) f64 {
+        return math.pi * self.radii.x * self.radii.y;
+    }
 
-        return PathEl{ .curve_to = struct {
-            .p0 = self.center.sum(p1),
-            .p1 = self.center.sum(p2),
-            .end = self.center.sum(p3),
-        } };
+    /// The perimeter of the arc.
+    ///
+    /// For now we just approximate by using the bezier curve representation.
+    pub fn perimeter(self: *const @This(), accuracy: f64) f64 {
+        return self.pathElements(0.1).perimeter(accuracy);
     }
 };
-
-/// Take the ellipse radii, how the radii are rotated, and the sweep angle, and return a point on
-/// the ellipse.
-fn sample_ellipse(radii: Vec2, x_rotation: f64, angle: f64) Vec2 {
-    const angle_sin = math.sin(angle);
-    const angle_cos = math.cos(angle);
-    const u = radii.x * angle_cos;
-    const v = radii.y * angle_sin;
-    return rotate_pt(Vec2.new(u, v), x_rotation);
-}
-
-/// Rotate `pt` about the origin by `angle` radians.
-fn rotate_pt(pt: Vec2, angle: f64) Vec2 {
-    const angle_sin = math.sin(angle);
-    const angle_cos = math.cos(angle);
-    return Vec2.new(
-        pt.x * angle_cos - pt.y * angle_sin,
-        pt.x * angle_sin + pt.y * angle_cos,
-    );
-}

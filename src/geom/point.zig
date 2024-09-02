@@ -125,24 +125,46 @@ pub const Point = struct {
     /// try expectEqual(b.x, 3.0);
     /// try expectEqual(b.y, -3.0);
     /// ```
-    pub fn trunc(self: Point) Point {
-        return Point.new(math.trunc(self.y), math.trunc(self.y));
+    pub fn trunc(self: @This()) @This() {
+        return @This().new(math.trunc(self.y), math.trunc(self.y));
     }
 
     /// Is this point finite?
-    pub fn isFinite(self: *const Point) bool {
+    pub fn isFinite(self: *const @This()) bool {
         return math.isFinite(self.x) and math.isFinite(self.y);
     }
 
     /// Is this point NaN?
-    pub fn isNan(self: *const Point) bool {
+    pub fn isNan(self: *const @This()) bool {
         return math.isNan(self.x) or math.isNan(self.y);
     }
 
-    pub fn sum(self: Point, other: Point) Point {
-        return Point{ .x = self.x + other.x, .y = self.y + other.y };
+    pub fn sum(self: @This(), other: @This()) @This() {
+        return @This(){ .x = self.x + other.x, .y = self.y + other.y };
     }
 
+    pub fn sub(self: @This(), other: @This()) @This() {
+        return @This(){
+            .x = self.x - other.x,
+            .y = self.y - other.y,
+        };
+    }
+
+    /// Multiplied by `t` value vector
+    pub fn mul(self: @This(), t: f64) @This() {
+        return @This(){
+            .x = self.x * t,
+            .y = self.y * t,
+        };
+    }
+
+    /// Divided by `t` value vector
+    pub fn div(self: @This(), t: f64) @This() {
+        return @This(){
+            .x = self.x / t,
+            .y = self.y / t,
+        };
+    }
 
     /// Apply an affine to a point
     pub fn applyAffine(self: Point, transform: Affine) Point {
